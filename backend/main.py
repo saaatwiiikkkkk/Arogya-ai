@@ -580,31 +580,54 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_compat(request: ChatRequest):
-    await asyncio.sleep(0.8)
+    from services.gemini import configure_gemini, GEMINI_API_KEY, GEMINI_MODEL
+    import google.generativeai as genai
     
-    prescription_responses = [
-        "Based on the prescription analysis, I found no major drug interactions. The dosages appear to be within standard therapeutic ranges.",
-        "I've reviewed the medications listed. The combination of these drugs is commonly prescribed and generally well-tolerated.",
-        "Looking at the prescription, I recommend monitoring for common side effects such as dizziness or nausea during the first week of treatment."
-    ]
+    if not GEMINI_API_KEY:
+        fallback_responses = {
+            "prescription": "I can help analyze prescriptions. Please configure GEMINI_API_KEY for AI-powered responses.",
+            "scan": "I can help analyze medical scans. Please configure GEMINI_API_KEY for AI-powered responses."
+        }
+        return {
+            "id": str(uuid.uuid4().hex[:12]),
+            "role": "assistant",
+            "content": fallback_responses.get(request.context, "How can I assist you today?"),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
     
-    scan_responses = [
-        "The scan appears to show normal anatomical structures. However, please note this is an assistive analysis and should be confirmed by a radiologist.",
-        "Based on the image analysis, I've identified the key regions of interest. The preliminary assessment suggests no significant abnormalities.",
-        "I've analyzed the scan. The image quality is good, and I can provide a detailed breakdown of the findings upon request."
-    ]
-    
-    if request.context == "prescription":
-        response = random.choice(prescription_responses)
-    else:
-        response = random.choice(scan_responses)
-    
-    return {
-        "id": str(uuid.uuid4().hex[:12]),
-        "role": "assistant",
-        "content": response,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    try:
+        configure_gemini()
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        
+        context_prompts = {
+            "prescription": "You are a helpful clinical pharmacist assistant. Answer questions about prescriptions, medications, dosages, and drug safety. Be concise and professional.",
+            "scan": "You are a helpful radiology assistant. Answer questions about medical imaging, scan interpretations, and imaging procedures. Always note that your analysis is assistive and non-diagnostic."
+        }
+        
+        system_prompt = context_prompts.get(request.context, "You are a helpful medical assistant. Be concise and professional.")
+        
+        prompt = f"""{system_prompt}
+
+User question: {request.message}
+
+Provide a helpful, concise response. Do not provide specific diagnoses - always recommend consulting with healthcare providers for medical decisions."""
+
+        response = model.generate_content(prompt)
+        
+        return {
+            "id": str(uuid.uuid4().hex[:12]),
+            "role": "assistant",
+            "content": response.text.strip(),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "id": str(uuid.uuid4().hex[:12]),
+            "role": "assistant",
+            "content": f"I apologize, but I encountered an issue processing your request. Please try again.",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
 if __name__ == "__main__":
     import uvicorn

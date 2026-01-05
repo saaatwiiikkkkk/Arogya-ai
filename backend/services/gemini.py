@@ -4,7 +4,7 @@ from typing import List, Tuple
 from PyPDF2 import PdfReader
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 def configure_gemini():
     if GEMINI_API_KEY:
