@@ -36,7 +36,7 @@ export function Chatbot({ context, placeholder = "Ask a question..." }: ChatbotP
         context,
       });
 
-      const assistantMessage = response as ChatMessage;
+      const assistantMessage = await response.json() as ChatMessage;
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage: ChatMessage = {
@@ -90,9 +90,9 @@ export function Chatbot({ context, placeholder = "Ask a question..." }: ChatbotP
                     : "bg-muted"
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 <span className="text-xs opacity-70 mt-1 block">
-                  {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                 </span>
               </div>
               {message.role === "user" && (
