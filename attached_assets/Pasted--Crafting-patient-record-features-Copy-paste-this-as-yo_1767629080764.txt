@@ -1,0 +1,207 @@
+
+Crafting patient record features
+Copy/paste this as your Lovable prompt (it’s already structured, unambiguous, and matches exactly what you described):
+
+Build a responsive, attractive medical-themed web app called “Arogya AI”. Use React 18 + TypeScript with a clean modern UI (shadcn/ui + Tailwind). Do NOT add any extra pages or features beyond what is specified. Keep the theme “clinical / medical” (clean, lots of whitespace, professional), but avoid overly complex visuals.
+
+0) Global Requirements
+Use React Router.
+Use a layout with consistent spacing and professional typography.
+Use shadcn/ui components (Button, Card, Tabs, Input, Textarea, Dialog if needed, Table, Badge, Separator).
+Include loading states and friendly inline error messages.
+Implement auth state as a simple client-side mock for now (localStorage/sessionStorage):
+userRole: "doctor" or "patient"
+patientId: string for patients
+Add Logout button in both dashboards that clears auth state and returns to Landing.
+1) Pages / Routes
+Create only these routes:
+
+A) Landing Page /
+Medical-themed landing page with:
+
+Navigation header (logo/name “Arogya AI” + a “Get Started” button).
+Hero section:
+Headline: “Arogya AI: The Intelligent Clinical Safety Layer”
+Subheadline: “Assisting the Doctor, Empowering the Patient, Humanizing Healthcare.”
+Primary CTA button: “Get Started”
+On click “Get Started”, navigate to /auth.
+B) Auth Flow /auth
+This is a combined Signup/Login experience (single page is fine) with role selection.
+
+Requirements:
+
+Show two large selectable cards/buttons:
+“Patient Login”
+“Doctor Login”
+After role selection:
+Show a simple form (email + password fields). Include both “Login” and “Sign Up” buttons (same UI, no backend).
+On successful mock login/signup:
+If Doctor: navigate to /doctor
+If Patient: navigate to /patient
+Patient ID generation:
+When a patient logs in/signs up, generate a Patient ID (e.g., a short random ID like PAT-XXXXX) and store it in localStorage as patientId.
+Show the Patient ID on patient dashboard (top-right corner).
+2) Doctor Dashboard /doctor
+Create a dashboard layout:
+
+Top bar with app name + Logout button.
+Left sidebar navigation with exactly these sections:
+Patient Records
+AI Prescription Verifier
+Drug Interaction Check
+MRI/X-ray Scan
+Each section is a page/route under the doctor area (nested routes are fine):
+
+/doctor/records
+/doctor/prescription-verifier
+/doctor/drug-interactions
+/doctor/scans
+Default route: /doctor/records.
+
+2.1 Doctor Feature: Patient Records /doctor/records
+UI requirements:
+
+Input field: “Enter Patient ID”
+Button: “Fetch Records”
+Once fetched, show a table/list of records for that patient:
+Record name/title (or filename)
+Submitted date and time
+Actions:
+View (opens a preview panel or modal)
+Download (downloads the file)
+If multiple records exist, display all, sorted newest first.
+For now, use mocked data in-app (until backend exists). Make it easy to replace with API later.
+2.2 Doctor Feature: AI Prescription Verifier /doctor/prescription-verifier
+Layout requirements:
+
+Left side: Upload area + controls
+Right side: AI summarized response box
+Bottom: AI Chatbot panel (sticky at bottom of the content area)
+UI components:
+
+Upload control to upload patient record files (PDF/images) (mock handling is fine).
+Button: “Submit & Analyze”
+On click:
+Show loading state
+Then show an “AI Summary” in a right-side Card (mock summary text)
+AI Chatbot at bottom:
+Chat input + Send button
+Message thread area
+The doctor can ask questions “about the records” and receive mock answers
+Keep the chatbot visible at the bottom of this page only (not global).
+2.3 Doctor Feature: Drug Interaction Check /doctor/drug-interactions
+This feature MUST be a 3-step flow (wizard). Use a Stepper UI or clearly labeled steps.
+
+Step 1: Drug inputs
+
+Two drug inputs, each with:
+Drug name
+Dosage (free text, e.g., “500mg twice daily”)
+Button: “Next”
+Step 2: Personal details
+
+Age (number)
+Height (number + unit label)
+Weight (number + unit label)
+Additional information (optional Textarea)
+Button: “Next”
+Step 3: Summarize
+
+Button: “Summarize”
+Show the response (mocked) in a result panel/card on the same page.
+Allow Back navigation to previous steps (but keep it simple).
+The response should look medical/structured (example format):
+
+Overall status: Safe / Warning
+Explanation paragraph
+Suggested next steps (bullets)
+2.4 Doctor Feature: MRI/X-ray Scan /doctor/scans
+Layout requirements:
+
+Left: Upload scan control + “Analyze” action
+Right: Result panel showing analysis summary (mock)
+Bottom: Chatbot panel for questions about the scan summary
+UI components:
+
+Upload button (accept images)
+Button: “Analyze”
+Result card on right side with:
+“Assistive, non-diagnostic” label
+Summary text (mock)
+Chatbot at bottom (same style as prescription verifier chatbot)
+3) Patient Dashboard /patient
+Dashboard layout:
+
+Top bar with app name + Patient ID shown at top-right + Logout button.
+Left sidebar navigation with exactly:
+Upload Records
+My Documents
+Default route: /patient/upload.
+
+3.1 Patient Feature: Upload Records /patient/upload
+UI requirements:
+
+Upload control for patient records
+After upload: show “Upload successful” message (inline alert or toast)
+Store uploaded items in client-side state so they appear in “My Documents”.
+3.2 Patient Feature: My Documents /patient/documents
+UI requirements:
+
+Table/list of uploaded documents
+Each item has:
+Filename
+Uploaded date/time
+Actions: View and Download
+4) Data / Mocking Rules (until backend exists)
+Use client-side mocked storage for records and documents:
+When patient uploads documents, save them (metadata + object URL) in localStorage or in-memory state (localStorage preferred for persistence).
+Doctor “Fetch Records” should retrieve by patient ID from this same store (simulate real behavior).
+Keep types clean and centralized:
+PatientRecord: { id, patientId, filename, uploadedAt, url }
+ChatMessage: { role: "user" | "assistant", content, timestamp }
+5) UX Notes (Important)
+Keep everything minimal and professional.
+Do not add extra features like analytics, settings pages, or admin panels.
+Ensure navigation is clear and flows match exactly:
+Landing → Get Started → Auth → Choose role → Login/Signup → correct dashboard.
+Deliver the complete frontend project ready to run.
+
+If you want, I can also create a matching backend API contract (endpoints + request/response JSON) so when you “bring the Lovable frontend files here,” we can connect it cleanly without changing UI behavior.
+
+GPT-5.2 • 1x
+Restore Checkpoint
+yep do that , after i bring frontnend folder
+
+Updating documentation and committing
+I’ll add an API_CONTRACT.md now (backend endpoints + request/response schemas) so when you drop in the Lovable frontend/ folder, we can wire it up immediately with minimal changes.
+
+Created API_CONTRACT.md
+
+Edited
+readme.md+1-0
+git status
+git status
+git add .gitignore API_CONTRACT.md readme.md; git commit -m "Add API contract and gitignore"; git push
+Added the backend/frontend schema doc at API_CONTRACT.md and linked it in readme.md. Also added .gitignore so your local-only agent guide won’t be committed.
+
+Right now these changes are NOT committed yet (you skipped the commit). If you want them pushed to GitHub, run:
+
+git add .gitignore [API_CONTRACT.md](http://_vscodecontentref_/3) readme.md
+git commit -m "Add API contract and gitignore"
+git push
+When you bring the Lovable frontend/ folder
+
+Drop it into the repo root as frontend/.
+Tell me once it’s there, and I’ll:
+align its API calls to API_CONTRACT.md,
+scaffold the FastAPI backend with matching endpoints,
+set up CORS + environment (VITE_API_BASE_URL),
+wire “view/download” to the /files/... endpoints.
+If you want the cleanest integration: make sure Lovable uses VITE_API_BASE_URL and keeps all API calls in one place (e.g., src/api/).
+
+3 files changed
++264
+-3
+Keep
+Undo
+API_CONTRACT.md
