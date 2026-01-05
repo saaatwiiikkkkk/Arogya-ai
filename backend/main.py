@@ -451,28 +451,69 @@ async def create_record_compat(request: dict):
         "uploadedAt": submitted_at
     }
 
+class PrescriptionAnalysisRequest(BaseModel):
+    text: Optional[str] = None
+
 @app.post("/api/analyze/prescription")
-async def analyze_prescription_compat():
-    await asyncio.sleep(1.5)
+async def analyze_prescription_compat(request: PrescriptionAnalysisRequest = None):
+    from services.gemini import configure_gemini, GEMINI_API_KEY, GEMINI_MODEL
+    import google.generativeai as genai
     
-    return {
-        "summary": "The prescription has been analyzed and contains standard medications. The overall prescription appears to be clinically appropriate with standard dosages.",
-        "medications": [
-            {"name": "Amoxicillin", "dosage": "500mg", "frequency": "Three times daily for 7 days"},
-            {"name": "Ibuprofen", "dosage": "400mg", "frequency": "As needed, max 3 times daily"},
-            {"name": "Omeprazole", "dosage": "20mg", "frequency": "Once daily before breakfast"}
-        ],
-        "warnings": [
-            "Ibuprofen may cause GI irritation; Omeprazole provides gastric protection",
-            "Patient should complete full course of antibiotics"
-        ],
-        "recommendations": [
-            "Take Amoxicillin with food to reduce stomach upset",
-            "Avoid alcohol during antibiotic treatment",
-            "Monitor for allergic reactions in first 48 hours",
-            "Follow up if symptoms persist after completing course"
-        ]
-    }
+    prescription_text = request.text if request and request.text else "Standard prescription for review"
+    
+    if not GEMINI_API_KEY:
+        return {
+            "summary": "The prescription has been analyzed. This is a preliminary review - Gemini AI not configured.",
+            "medications": [
+                {"name": "Medication", "dosage": "As prescribed", "frequency": "As directed"}
+            ],
+            "warnings": ["Please consult with healthcare provider for complete analysis"],
+            "recommendations": ["Configure GEMINI_API_KEY for AI-powered prescription analysis"]
+        }
+    
+    try:
+        configure_gemini()
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        
+        prompt = f"""You are a clinical pharmacist assistant. Analyze this prescription and extract the following information. Respond in valid JSON format only.
+
+Prescription text: {prescription_text}
+
+Respond with this exact JSON structure:
+{{
+  "summary": "Brief summary of the prescription and clinical appropriateness",
+  "medications": [
+    {{"name": "Drug name", "dosage": "Dosage amount", "frequency": "How often to take"}}
+  ],
+  "warnings": ["List of warnings or precautions"],
+  "recommendations": ["List of recommendations for the patient"]
+}}
+
+Important: Only return the JSON object, no markdown or extra text."""
+
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+        
+        import json
+        result = json.loads(text)
+        
+        log_event("PRESCRIPTION_ANALYZED", None, {"method": "gemini"})
+        return result
+        
+    except Exception as e:
+        log_event("PRESCRIPTION_ANALYSIS_ERROR", None, {"error": str(e)[:100]})
+        return {
+            "summary": f"Prescription received for analysis. AI analysis encountered an issue: {str(e)[:50]}",
+            "medications": [{"name": "See prescription", "dosage": "As written", "frequency": "As directed"}],
+            "warnings": ["Manual review recommended"],
+            "recommendations": ["Consult with pharmacist for detailed analysis"]
+        }
 
 class DrugInteractionCompatRequest(BaseModel):
     drugs: List[dict]
