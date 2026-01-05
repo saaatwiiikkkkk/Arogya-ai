@@ -580,10 +580,12 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_compat(request: ChatRequest):
-    from services.gemini import configure_gemini, GEMINI_API_KEY, GEMINI_MODEL
     import google.generativeai as genai
     
-    if not GEMINI_API_KEY:
+    api_key = os.getenv("GEMINI_API_KEY")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+    
+    if not api_key:
         fallback_responses = {
             "prescription": "I can help analyze prescriptions. Please configure GEMINI_API_KEY for AI-powered responses.",
             "scan": "I can help analyze medical scans. Please configure GEMINI_API_KEY for AI-powered responses."
@@ -596,8 +598,8 @@ async def chat_compat(request: ChatRequest):
         }
     
     try:
-        configure_gemini()
-        model = genai.GenerativeModel(GEMINI_MODEL)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
         
         context_prompts = {
             "prescription": "You are a helpful clinical pharmacist assistant. Answer questions about prescriptions, medications, dosages, and drug safety. Be concise and professional.",
@@ -622,6 +624,7 @@ Provide a helpful, concise response. Do not provide specific diagnoses - always 
         }
         
     except Exception as e:
+        print(f"Chat error: {type(e).__name__}: {str(e)}")
         return {
             "id": str(uuid.uuid4().hex[:12]),
             "role": "assistant",
