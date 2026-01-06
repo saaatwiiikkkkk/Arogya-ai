@@ -11,9 +11,9 @@ import type { UserRole } from "@shared/schema";
 
 export default function Auth() {
   const [, navigate] = useLocation();
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export default function Auth() {
 
   const handleBack = () => {
     setSelectedRole(null);
-    setEmail("");
+    setUsername("");
     setPassword("");
     setError("");
   };
@@ -34,13 +34,8 @@ export default function Auth() {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       setError("Please fill in all fields");
-      return;
-    }
-
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address");
       return;
     }
 
@@ -51,14 +46,20 @@ export default function Auth() {
 
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    if (selectedRole) {
-      login(selectedRole, email);
-      navigate(selectedRole === "doctor" ? "/doctor" : "/patient");
+    try {
+      if (selectedRole) {
+        if (isSignUp) {
+          await register(username, password, selectedRole);
+        } else {
+          await login(username, password, selectedRole);
+        }
+        navigate(selectedRole === "doctor" ? "/doctor" : "/patient");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -162,15 +163,15 @@ export default function Auth() {
               <CardContent>
                 <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="username">Username</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="username"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       disabled={isLoading}
-                      data-testid="input-email"
+                      data-testid="input-username"
                     />
                   </div>
                   <div className="space-y-2">
@@ -221,3 +222,4 @@ export default function Auth() {
     </div>
   );
 }
+

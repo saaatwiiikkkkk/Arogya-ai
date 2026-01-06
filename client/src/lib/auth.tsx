@@ -1,23 +1,17 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { UserRole, AuthState } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType extends AuthState {
-  login: (role: UserRole, email: string) => void;
+  login: (username: string, password: string, role?: UserRole) => Promise<void>;
+  register: (username: string, password: string, role: UserRole, name?: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function generatePatientId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "PAT-";
-  for (let i = 0; i < 5; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return id;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { toast } = useToast();
   const [authState, setAuthState] = useState<AuthState>(() => {
     const stored = localStorage.getItem("authState");
     if (stored) {
@@ -34,14 +28,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("authState", JSON.stringify(authState));
   }, [authState]);
 
-  const login = useCallback((role: UserRole, _email: string) => {
-    const patientId = role === "patient" ? generatePatientId() : null;
-    setAuthState({
-      userRole: role,
-      patientId,
-      isAuthenticated: true,
-    });
-  }, []);
+  const login = useCallback(async (username: string, password: string, role?: UserRole) => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, role }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || "Login failed");
+      }
+
+      const data = await res.json();
+      setAuthState({
+        userRole: data.role,
+        patientId: data.patient_id,
+        isAuthenticated: true,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: error.message,
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  const register = useCallback(async (username: string, password: string, role: UserRole, name?: string) => {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, role, name }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || "Registration failed");
+      }
+
+      const data = await res.json();
+      setAuthState({
+        userRole: data.role,
+        patientId: data.patient_id,
+        isAuthenticated: true,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: error.message,
+      });
+      throw error;
+    }
+  }, [toast]);
 
   const logout = useCallback(() => {
     setAuthState({
@@ -53,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout }}>
+    <AuthContext.Provider value={{ ...authState, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

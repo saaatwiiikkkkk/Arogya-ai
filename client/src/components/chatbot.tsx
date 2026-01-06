@@ -9,9 +9,10 @@ import type { ChatMessage } from "@shared/schema";
 interface ChatbotProps {
   context: "prescription" | "scan";
   placeholder?: string;
+  analysisData?: any;
 }
 
-export function Chatbot({ context, placeholder = "Ask a question..." }: ChatbotProps) {
+export function Chatbot({ context, placeholder = "Ask a question...", analysisData }: ChatbotProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +35,7 @@ export function Chatbot({ context, placeholder = "Ask a question..." }: ChatbotP
       const response = await apiRequest("POST", "/api/chat", {
         message: input.trim(),
         context,
+        analysis_context: analysisData ? JSON.stringify(analysisData) : undefined,
       });
 
       const assistantMessage = await response.json() as ChatMessage;
@@ -66,7 +68,7 @@ export function Chatbot({ context, placeholder = "Ask a question..." }: ChatbotP
         <span className="text-xs text-muted-foreground ml-2">Assistive, non-diagnostic</span>
       </div>
       
-      <ScrollArea className="flex-1 h-48 max-h-48">
+      <ScrollArea className="flex-1 h-[500px]">
         <div className="p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground text-sm py-8">
