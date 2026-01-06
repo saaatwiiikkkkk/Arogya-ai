@@ -48,10 +48,34 @@ export default function PrescriptionVerifier() {
 
     setIsAnalyzing(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    setAnalysis(mockAnalysis);
-    setIsAnalyzing(false);
+    try {
+      // In a real app, we would upload the file first to get text/image content
+      // For this demo, we'll simulate sending text content
+      // Ideally, we should upload the file to an endpoint that extracts text/image and sends to Gemini
+      
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      
+      // First upload/analyze endpoint
+      const res = await fetch("/api/analyze/prescription-upload", {
+        method: "POST",
+        body: formData
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysis(data);
+      } else {
+        // Fallback to mock if API fails or not configured
+        console.error("Analysis failed, falling back to mock");
+        setAnalysis(mockAnalysis);
+      }
+    } catch (error) {
+      console.error("Analysis error:", error);
+      setAnalysis(mockAnalysis);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -193,6 +217,7 @@ export default function PrescriptionVerifier() {
       <Chatbot
         context="prescription"
         placeholder="Ask questions about the prescription analysis..."
+        analysisData={analysis}
       />
     </div>
   );

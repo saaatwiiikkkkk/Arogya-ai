@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "@/lib/queryClient";
 import type { DrugInput, PersonalDetails, DrugInteractionResult } from "@shared/schema";
 
 const mockResults: Record<string, DrugInteractionResult> = {
@@ -71,11 +72,23 @@ export default function DrugInteractions() {
   const handleSummarize = async () => {
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    const resultType = Math.random() > 0.5 ? "safe" : "warning";
-    setResult(mockResults[resultType]);
-    setIsLoading(false);
+    try {
+      const res = await apiRequest("POST", "/api/analyze/drug-interactions", {
+        drugs,
+        personalDetails
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      setResult({
+        status: "warning",
+        explanation: "Failed to connect to analysis service. Please try again.",
+        suggestions: ["Check internet connection", "Try again later"]
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleReset = () => {

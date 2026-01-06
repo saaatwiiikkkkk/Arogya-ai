@@ -53,10 +53,38 @@ export default function Scans() {
 
     setIsAnalyzing(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
 
-    setResult(mockScanResult);
-    setIsAnalyzing(false);
+      const res = await fetch("/api/analyze/scan", {
+        method: "POST",
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setResult(data);
+      } else {
+        const errorText = await res.text();
+        console.error("Scan analysis failed:", errorText);
+        // Show actual error instead of mock
+        setResult({
+          summary: "Analysis Failed",
+          findings: ["Error communicating with analysis server", `Details: ${errorText.substring(0, 100)}`],
+          recommendations: ["Please try again later", "Check network connection"]
+        });
+      }
+    } catch (error) {
+      console.error("Scan analysis error:", error);
+      setResult({
+          summary: "Analysis Error",
+          findings: [error instanceof Error ? error.message : "Unknown error occurred"],
+          recommendations: ["Please ensure backend server is running", "Check your internet connectivity"]
+        });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -195,6 +223,7 @@ export default function Scans() {
       <Chatbot
         context="scan"
         placeholder="Ask questions about the scan analysis..."
+        analysisData={result}
       />
     </div>
   );

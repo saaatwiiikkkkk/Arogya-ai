@@ -22,13 +22,31 @@ export default function DoctorRecords() {
     setIsLoading(true);
     setHasFetched(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const fetchedRecords = getRecordsByPatientId(patientId.trim().toUpperCase());
-    setRecords(fetchedRecords.sort((a, b) => 
-      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    ));
-    setIsLoading(false);
+    try {
+      const res = await fetch(`/patients/${patientId.trim()}/documents`);
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Map backend Document to frontend PatientRecord
+        const mappedRecords: PatientRecord[] = data.items.map((doc: any) => ({
+          id: doc.id,
+          patientId: doc.patient_id,
+          filename: doc.filename,
+          uploadedAt: doc.submitted_at,
+          url: doc.download_url,
+          fileType: doc.mime_type,
+        }));
+        
+        setRecords(mappedRecords);
+      } else {
+        setRecords([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch records:", error);
+      setRecords([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
