@@ -21,7 +21,8 @@ async def analyze_medical_image(image_path: str) -> str:
         if HF_INFERENCE_ENDPOINT_URL:
             url = HF_INFERENCE_ENDPOINT_URL
         else:
-            url = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
+            # Updated 2026: Use router.huggingface.co instead of api-inference.huggingface.co
+            url = f"https://router.huggingface.co/models/{HF_MODEL_ID}"
         
         headers = {
             "Authorization": f"Bearer {HF_TOKEN}",
@@ -55,10 +56,14 @@ async def analyze_medical_image(image_path: str) -> str:
                 
                 return analysis
             else:
-                return generate_mock_analysis(image_path)
+                print(f"MedGemma API Error {response.status_code}: {response.text}")
+                # Return None to indicate failure so main.py can fallback to Gemini Vision
+                return None
                 
     except Exception as e:
-        return generate_mock_analysis(image_path, error=str(e))
+        print(f"MedGemma Exception: {e}")
+        # Return None to indicate failure
+        return None
 
 def generate_mock_analysis(image_path: str, error: Optional[str] = None) -> str:
     filename = os.path.basename(image_path).lower()

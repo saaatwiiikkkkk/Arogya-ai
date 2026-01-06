@@ -1,160 +1,113 @@
 import os
-import csv
-from typing import List, Dict, Tuple
+import json
+import pandas as pd
+from typing import List, Dict, Any
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-CSV_PATH = os.path.join(DATA_DIR, "data_final_v5.csv")
+# Correct paths based on workspace structure
+DATASET_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "dataset")
+DRUG_SYNONYMS_PATH = os.path.join(DATASET_DIR, "drugs_synonyms.json")
+INTERACTIONS_PATH = os.path.join(DATASET_DIR, "data_final_v5.csv")
 
-BUILTIN_INTERACTIONS = [
-    {"drug_a": "warfarin", "drug_b": "aspirin", "severity": "major", "note": "Increased bleeding risk"},
-    {"drug_a": "warfarin", "drug_b": "ibuprofen", "severity": "major", "note": "Increased bleeding risk"},
-    {"drug_a": "metformin", "drug_b": "alcohol", "severity": "moderate", "note": "Risk of lactic acidosis"},
-    {"drug_a": "lisinopril", "drug_b": "potassium", "severity": "moderate", "note": "Hyperkalemia risk"},
-    {"drug_a": "simvastatin", "drug_b": "grapefruit", "severity": "moderate", "note": "Increased statin levels"},
-    {"drug_a": "methotrexate", "drug_b": "nsaids", "severity": "major", "note": "Reduced methotrexate clearance"},
-    {"drug_a": "digoxin", "drug_b": "amiodarone", "severity": "major", "note": "Digoxin toxicity risk"},
-    {"drug_a": "ssri", "drug_b": "maoi", "severity": "contraindicated", "note": "Serotonin syndrome risk"},
-    {"drug_a": "ciprofloxacin", "drug_b": "theophylline", "severity": "major", "note": "Theophylline toxicity"},
-    {"drug_a": "fluconazole", "drug_b": "warfarin", "severity": "major", "note": "Increased INR/bleeding risk"},
-]
+class InteractionService:
+    _instance = None
+    _synonyms = {}
+    _interactions_df = None
+    _name_to_id_map = {}
 
-FOOD_INTERACTIONS = [
-    {"drug": "warfarin", "food": "vitamin k", "severity": "moderate", "note": "Reduced anticoagulant effect"},
-    {"drug": "warfarin", "food": "green leafy vegetables", "severity": "moderate", "note": "High vitamin K content"},
-    {"drug": "tetracycline", "food": "dairy", "severity": "moderate", "note": "Reduced absorption"},
-    {"drug": "maoi", "food": "tyramine", "severity": "major", "note": "Hypertensive crisis risk"},
-    {"drug": "statin", "food": "grapefruit", "severity": "moderate", "note": "Increased drug levels"},
-    {"drug": "levothyroxine", "food": "calcium", "severity": "moderate", "note": "Reduced absorption"},
-    {"drug": "metronidazole", "food": "alcohol", "severity": "major", "note": "Disulfiram-like reaction"},
-]
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(InteractionService, cls).__new__(cls)
+            cls._instance._load_data()
+        return cls._instance
 
-def load_csv_interactions() -> List[Dict]:
-    if os.path.exists(CSV_PATH):
+    def _load_data(self):
+        print(f"Loading drug interaction data from {DATASET_DIR}...")
         try:
-            interactions = []
-            with open(CSV_PATH, "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    interactions.append(row)
-            return interactions
-        except Exception:
+            # Load synonyms
+            if os.path.exists(DRUG_SYNONYMS_PATH):
+                with open(DRUG_SYNONYMS_PATH, "r", encoding="utf-8") as f:
+                    self._synonyms = json.load(f)
+                
+                # Create reverse map: Name -> ID
+                for drug_id, names in self._synonyms.items():
+                    for name in names:
+                        if name:
+                            self._name_to_id_map[name.lower()] = drug_id
+            else:
+                print(f"Warning: Synonyms file not found at {DRUG_SYNONYMS_PATH}")
+
+            # Load interactions CSV
+            if os.path.exists(INTERACTIONS_PATH):
+                # Using pandas for efficient querying
+                # Assuming columns: ["Drug1", "Interaction", "Drug2", "Adverse Effects"]
+                self._interactions_df = pd.read_csv(INTERACTIONS_PATH)
+                
+                # Clean up IDs in CSV if they have prefixes like "Compound::"
+                self._interactions_df["Drug1"] = self._interactions_df["Drug1"].apply(lambda x: x.replace("Compound::", "") if isinstance(x, str) else x)
+                self._interactions_df["Drug2"] = self._interactions_df["Drug2"].apply(lambda x: x.replace("Compound::", "") if isinstance(x, str) else x)
+                
+                print("Drug interaction data loaded successfully.")
+            else:
+                print(f"Warning: Interactions file not found at {INTERACTIONS_PATH}")
+                self._interactions_df = pd.DataFrame(columns=["Drug1", "Interaction", "Drug2", "Adverse Effects"])
+
+        except Exception as e:
+            print(f"Error loading interaction data: {e}")
+            # Initialize empty if failed to prevent crashes
+            self._interactions_df = pd.DataFrame(columns=["Drug1", "Interaction", "Drug2", "Adverse Effects"])
+
+    def get_drug_id(self, drug_name: str) -> str:
+        return self._name_to_id_map.get(drug_name.lower())
+
+    def check_interactions(self, drug_names: List[str]) -> List[Dict[str, Any]]:
+        drug_ids = {}
+        found_interactions = []
+
+        # Resolve names to IDs
+        for name in drug_names:
+            drug_id = self.get_drug_id(name)
+            if drug_id:
+                drug_ids[drug_id] = name
+            else:
+                # Try fuzzy match or just keep name if no ID found? 
+                # Without ID, we can not query the CSV which uses IDs.
+                pass
+        
+        if len(drug_ids) < 2:
             return []
-    return []
 
-def normalize_drug_name(name: str) -> str:
-    return name.lower().strip()
+        ids_to_check = list(drug_ids.keys())
+        
+        if self._interactions_df is None or self._interactions_df.empty:
+            return []
 
-def check_drug_drug_interactions(drugs: List[Dict]) -> List[Dict]:
-    matches = []
-    csv_interactions = load_csv_interactions()
-    
-    drug_names = [normalize_drug_name(d["name"]) for d in drugs]
-    
-    for i, drug_a in enumerate(drug_names):
-        for j, drug_b in enumerate(drug_names):
-            if i >= j:
+        # Query DataFrame
+        # We want rows where Drug1 is in our list AND Drug2 is in our list
+        mask = (
+            (self._interactions_df["Drug1"].isin(ids_to_check)) & 
+            (self._interactions_df["Drug2"].isin(ids_to_check))
+        )
+        
+        results = self._interactions_df[mask]
+        
+        for _, row in results.iterrows():
+            id1 = row["Drug1"]
+            id2 = row["Drug2"]
+            
+            # Skip self-interactions if any
+            if id1 == id2:
                 continue
+
+            interaction = {
+                "drug1": drug_ids.get(id1, id1),
+                "drug2": drug_ids.get(id2, id2),
+                "description": row["Interaction"],
+                "severity": "Moderate", # Defaulting as dataset does not specify
+                "adverse_effects": row["Adverse Effects"] if pd.notna(row["Adverse Effects"]) else "Not specified"
+            }
+            found_interactions.append(interaction)
             
-            for interaction in BUILTIN_INTERACTIONS:
-                ia = normalize_drug_name(interaction["drug_a"])
-                ib = normalize_drug_name(interaction["drug_b"])
-                
-                if (ia in drug_a or drug_a in ia) and (ib in drug_b or drug_b in ib):
-                    matches.append({
-                        "type": "drug-drug",
-                        "a": drugs[i]["name"],
-                        "b": drugs[j]["name"],
-                        "severity": interaction.get("severity"),
-                        "note": interaction.get("note")
-                    })
-                elif (ib in drug_a or drug_a in ib) and (ia in drug_b or drug_b in ia):
-                    matches.append({
-                        "type": "drug-drug",
-                        "a": drugs[i]["name"],
-                        "b": drugs[j]["name"],
-                        "severity": interaction.get("severity"),
-                        "note": interaction.get("note")
-                    })
-            
-            for csv_int in csv_interactions:
-                csv_a = normalize_drug_name(csv_int.get("drug_a", ""))
-                csv_b = normalize_drug_name(csv_int.get("drug_b", ""))
-                
-                if (csv_a in drug_a or drug_a in csv_a) and (csv_b in drug_b or drug_b in csv_b):
-                    matches.append({
-                        "type": "drug-drug",
-                        "a": drugs[i]["name"],
-                        "b": drugs[j]["name"],
-                        "severity": csv_int.get("severity"),
-                        "note": csv_int.get("description") or csv_int.get("note")
-                    })
-    
-    return matches
+        return found_interactions
 
-def check_drug_food_interactions(drugs: List[Dict], foods: List[str]) -> List[Dict]:
-    matches = []
-    drug_names = [normalize_drug_name(d["name"]) for d in drugs]
-    food_names = [f.lower().strip() for f in foods]
-    
-    for drug in drug_names:
-        for food in food_names:
-            for interaction in FOOD_INTERACTIONS:
-                idrug = normalize_drug_name(interaction["drug"])
-                ifood = interaction["food"].lower()
-                
-                if (idrug in drug or drug in idrug) and (ifood in food or food in ifood):
-                    matches.append({
-                        "type": "drug-food",
-                        "a": drug,
-                        "b": food,
-                        "severity": interaction.get("severity"),
-                        "note": interaction.get("note")
-                    })
-    
-    return matches
+interaction_service = InteractionService()
 
-def generate_explanation(matches: List[Dict], patient_info: Dict) -> str:
-    if not matches:
-        return "No significant drug interactions were identified based on the provided medications and foods. However, always consult with your healthcare provider or pharmacist before making any changes to your medication regimen."
-    
-    severity_order = {"contraindicated": 4, "major": 3, "moderate": 2, "minor": 1}
-    max_severity = max(severity_order.get(m.get("severity", "").lower(), 0) for m in matches)
-    
-    explanations = []
-    
-    if max_severity >= 3:
-        explanations.append("IMPORTANT: Significant drug interactions have been identified that require immediate attention from your healthcare provider.")
-    else:
-        explanations.append("Potential interactions have been identified. Please discuss these with your healthcare provider.")
-    
-    for match in matches[:5]:
-        interaction_type = "Drug-drug" if match["type"] == "drug-drug" else "Drug-food"
-        severity = match.get("severity", "unknown").capitalize()
-        note = match.get("note", "Interaction noted")
-        explanations.append(f"- {interaction_type} ({severity}): {match['a']} and {match['b']} - {note}")
-    
-    if patient_info.get("age", 0) > 65:
-        explanations.append("Note: Patients over 65 may be more susceptible to drug interactions. Extra caution advised.")
-    
-    explanations.append("\nPlease consult with your clinician or pharmacist before making any changes to your medications.")
-    
-    return "\n".join(explanations)
-
-def check_interactions(drugs: List[Dict], patient: Dict, foods: List[str]) -> Tuple[str, List[Dict], str]:
-    drug_drug_matches = check_drug_drug_interactions(drugs)
-    drug_food_matches = check_drug_food_interactions(drugs, foods)
-    
-    all_matches = drug_drug_matches + drug_food_matches
-    
-    if not all_matches:
-        overall = "safe"
-    else:
-        severities = [m.get("severity", "").lower() for m in all_matches]
-        if "contraindicated" in severities or "major" in severities:
-            overall = "warning"
-        else:
-            overall = "warning"
-    
-    explanation = generate_explanation(all_matches, patient)
-    
-    return overall, all_matches, explanation
