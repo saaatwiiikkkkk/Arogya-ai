@@ -94,3 +94,23 @@ class InteractionCheckResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str  # "doctor" or "patient"
+    name: Optional[str] = None # For creating patient record automatically
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+    role: Optional[str] = None
+
+class AuthResponse(BaseModel):
+    token: str # For now we might just return user info, but token is better practice. 
+    # Since we are doing simple auth, maybe just return user details and handle session on client or simple token
+    user_id: str
+    username: str
+    role: str
+    patient_id: Optional[str] = None
+

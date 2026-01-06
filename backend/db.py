@@ -26,6 +26,17 @@ def init_db():
         cursor = conn.cursor()
         
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                patient_id TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS patients (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
