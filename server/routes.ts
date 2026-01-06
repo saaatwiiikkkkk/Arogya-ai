@@ -60,13 +60,12 @@ function proxyToFastAPI(req: Request, res: Response) {
     }
   });
   
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    if (req.rawBody) {
-      proxyReq.write(req.rawBody);
-    }
+  if (req.rawBody) {
+    proxyReq.write(req.rawBody);
+    proxyReq.end();
+  } else {
+    req.pipe(proxyReq, { end: true });
   }
-  
-  proxyReq.end();
 }
 
 export async function registerRoutes(
