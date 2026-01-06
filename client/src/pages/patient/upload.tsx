@@ -34,21 +34,17 @@ export default function PatientUpload() {
     setError(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const formData = new FormData();
+      formData.append("file", selectedFile);
 
-      const url = URL.createObjectURL(selectedFile);
+      const res = await fetch(`/patients/${patientId}/documents`, {
+        method: "POST",
+        body: formData,
+      });
 
-      const record: PatientRecord = {
-        id: generateRecordId(),
-        patientId: patientId,
-        filename: selectedFile.name,
-        uploadedAt: new Date().toISOString(),
-        url: url,
-        fileType: selectedFile.type,
-        fileSize: selectedFile.size,
-      };
-
-      addRecord(record);
+      if (!res.ok) {
+        throw new Error("Failed to upload file");
+      }
 
       setUploadSuccess(true);
       setSelectedFile(null);

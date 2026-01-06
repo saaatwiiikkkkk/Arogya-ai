@@ -14,12 +14,29 @@ export default function PatientDocuments() {
   const [previewRecord, setPreviewRecord] = useState<PatientRecord | null>(null);
 
   useEffect(() => {
-    if (patientId) {
-      const fetchedRecords = getRecordsByPatientId(patientId);
-      setRecords(fetchedRecords.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      ));
-    }
+    const fetchRecords = async () => {
+      if (patientId) {
+        try {
+          const res = await fetch(`/patients/${patientId}/documents`);
+          if (res.ok) {
+            const data = await res.json();
+            const mappedRecords: PatientRecord[] = data.items.map((doc: any) => ({
+              id: doc.id,
+              patientId: doc.patient_id,
+              filename: doc.filename,
+              uploadedAt: doc.submitted_at,
+              url: doc.download_url,
+              fileType: doc.mime_type,
+            }));
+            setRecords(mappedRecords);
+          }
+        } catch (error) {
+          console.error("Failed to fetch records:", error);
+        }
+      }
+    };
+
+    fetchRecords();
   }, [patientId]);
 
   const handleDownload = (record: PatientRecord) => {
